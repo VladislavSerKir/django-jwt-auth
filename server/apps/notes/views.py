@@ -1,36 +1,62 @@
-from rest_framework import viewsets, permissions, filters
-from django_filters.rest_framework import DjangoFilterBackend
-
-from apps.users.enums import Role
-from apps.users.middleware import method_roles
+from rest_framework import viewsets, permissions, status
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
 from .models import Note
 from .serializers import NoteSerializer
 
 
-class NoteViewSet(viewsets.ModelViewSet):
-    serializer_class = NoteSerializer
+class NoteViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend,
-                       filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['name', 'description']
-    ordering_fields = ['created_at', 'updated_at', 'name']
 
-    def get_queryset(self):
-        user = self.request.user
+    def list(self, request):
+        notes = Note.objects.filter(user=request.user)
+        serializer = NoteSerializer(notes, many=True)
+        return Response({'notes': serializer.data})
 
-        return Note.objects.filter(user=user)
+    def create(self, request):
+        serializer = NoteSerializer(
+            data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'note': serializer.data}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+    def retrieve(self, request, pk=None):
+        note = get_object_or_404(Note, id=pk)
 
+        if note.user != request.user:
+            return Response(
+                {'error': 'You do not have permission to access this note'},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
-@method_roles(Role.ADMIN)
-class AdminNoteViewSet(viewsets.ModelViewSet):
-    queryset = Note.objects.all()
-    serializer_class = NoteSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend,
-                       filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['user']
-    search_fields = ['name', 'description']
-    ordering_fields = ['created_at', 'updated_at', 'name']
+        serializer = NoteSerializer(note)
+        return Response({'note': serializer.data})
+
+    def update(self, request, pk=None):
+        note = get_object_or_404(Note, id=pk)
+
+        if note.user != request.user:
+            return Response(
+                {'error': 'You do not have permission to update this note'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = NoteSerializer(note, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'note': serializer.data})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        note = get_object_or_404(Note, id=pk)
+
+        if note.user != request.user:
+            return Response(
+                {'error': 'You do not have permission to delete this note'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        note_id = note.id
+        note.delete()
+        return Response({'id': note_id}, status=status.HTTP_200_OK)

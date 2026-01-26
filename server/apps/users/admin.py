@@ -4,6 +4,13 @@ from django import forms
 from django.contrib import messages
 from .models import User
 from .enums import Role
+from rest_framework_simplejwt.token_blacklist import models as blacklist_models
+from django.contrib.auth.models import Group
+
+admin.site.unregister(blacklist_models.OutstandingToken)
+admin.site.unregister(blacklist_models.BlacklistedToken)
+
+admin.site.unregister(Group)
 
 
 class UserCreationForm(forms.ModelForm):
@@ -54,7 +61,7 @@ class UserChangeForm(forms.ModelForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         password = self.cleaned_data.get("password")
-        if password:  # If new password is specified
+        if password:
             user.set_password(password)
         if commit:
             user.save()
@@ -68,7 +75,6 @@ class CustomUserAdmin(admin.ModelAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
 
-    # Define fields to display in admin
     fieldsets = (
         (None, {'fields': ('email',)}),
         (_('Personal info'), {'fields': ('name',)}),
@@ -83,32 +89,19 @@ class CustomUserAdmin(admin.ModelAdmin):
             'fields': ('last_login', 'created_at', 'updated_at')
         }),
     )
-
-    # Fields when creating a new user
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
             'fields': ('email', 'name', 'role', 'password1', 'password2'),
         }),
     )
-
-    # What to display in user list
     list_display = ('email', 'name', 'get_role_display',
                     'is_active', 'created_at')
-
-    # Filters
     list_filter = ('is_active', 'role', 'created_at')
-
-    # Search by these fields
     search_fields = ('email', 'name')
-
-    # Ordering
     ordering = ('email',)
-
-    # Read-only fields
     readonly_fields = ('last_login', 'created_at', 'updated_at')
 
-    # Custom methods for display
     def get_role_display(self, obj):
         """Display human-readable role name"""
         try:
@@ -125,14 +118,11 @@ class CustomUserAdmin(admin.ModelAdmin):
             form.base_fields['role'].choices = Role.choices()
         return form
 
-    # Method to get fields when creating a new user
-
     def get_fieldsets(self, request, obj=None):
-        if not obj:  # If creating new user
+        if not obj:
             return self.add_fieldsets
         return super().get_fieldsets(request, obj)
 
-    # Admin actions
     actions = ['make_admin', 'make_user', 'activate_users', 'deactivate_users']
 
     def make_admin(self, request, queryset):

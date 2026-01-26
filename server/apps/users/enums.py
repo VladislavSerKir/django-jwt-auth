@@ -1,7 +1,4 @@
 from enum import IntEnum
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 class Role(IntEnum):
@@ -19,7 +16,7 @@ class Role(IntEnum):
         elif self == Role.USER:
             return 'USER'
         else:
-            logger.warning('Unknown Role "%s"' % repr(self))
+            print.warning('Unknown Role "%s"' % repr(self))
             return str(self)
 
     def __str__(self):

@@ -1,11 +1,18 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import NoteViewSet, AdminNoteViewSet
+from django.urls import path
+from .views import NoteViewSet
 
-router = DefaultRouter()
-router.register(r'', NoteViewSet, basename='note')
-router.register(r'admin/all', AdminNoteViewSet, basename='admin-note')
+note_list = NoteViewSet.as_view({
+    'get': 'list',
+    'post': 'create'
+})
+
+note_detail = NoteViewSet.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'delete': 'destroy'
+})
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('', note_list, name='note-list'),
+    path('<int:pk>/', note_detail, name='note-detail'),
 ]

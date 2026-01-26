@@ -1,4 +1,3 @@
-# config/urls.py
 from django.contrib import admin
 from django.urls import path, include
 from django.http import HttpResponse
@@ -23,7 +22,6 @@ def home_view(request):
     <p>Welcome to the API!</p>
     <ul>
         <li><a href="/admin/">Admin Panel</a></li>
-        <li><a href="/swagger/">API Documentation (Swagger)</a></li>
         <li><a href="/redoc/">API Documentation (ReDoc)</a></li>
         <li><a href="/api/auth/register/">Register</a></li>
         <li><a href="/api/auth/login/">Login</a></li>
@@ -36,8 +34,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.users.urls')),
     path('api/notes/', include('apps.notes.urls')),
-    path('swagger/', schema_view.with_ui('swagger',
-         cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc',
          cache_timeout=0), name='schema-redoc'),
 ]

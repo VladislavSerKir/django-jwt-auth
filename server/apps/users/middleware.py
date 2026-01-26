@@ -1,14 +1,19 @@
-from .enums import Role
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.contrib.auth.models import AnonymousUser
+from enum import IntEnum
 from typing import Optional
-import logging
 
-logger = logging.getLogger(__name__)
+
+class Role(IntEnum):
+    USER = 0
+    ADMIN = 1
+
+    def __str__(self):
+        return self.name
 
 
 class RBACMiddleware:
-    """Role base access middleware"""
+    """Middleware for check user roles"""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -25,16 +30,19 @@ class RBACMiddleware:
             return None
 
         try:
-            return request.user.get_role()
+            if hasattr(request.user, 'get_role'):
+                return request.user.get_role()
+            elif hasattr(request.user, 'role'):
+                return Role(request.user.role)
         except Exception as e:
-            logger.error(f"Error getting user role: {e}")
-            return None
+            print(f"Error getting user role: {e}")
+
+        return None
 
 
 def method_roles(*roles: Role):
     """
-    Декоратор для проверки ролей в class-based views
-    Теперь работает правильно с классами
+    Decorator for role check class-based views
     """
     def decorator(cls):
         original_dispatch = cls.dispatch
@@ -42,16 +50,7 @@ def method_roles(*roles: Role):
         def new_dispatch(self, request, *args, **kwargs):
             user_role = getattr(request, 'user_role', None)
 
-            if user_role is None:
-                if hasattr(request.user, 'get_role'):
-                    user_role = request.user.get_role()
-                elif hasattr(request.user, 'role'):
-                    try:
-                        user_role = Role(request.user.role)
-                    except (ValueError, TypeError):
-                        user_role = None
-
-            if not request.user.is_authenticated or user_role is None:
+            if not request.user.is_authenticated:
                 return JsonResponse(
                     {
                         'error': 'AUTHENTICATION_REQUIRED',
@@ -60,60 +59,37 @@ def method_roles(*roles: Role):
                     status=401
                 )
 
-            if user_role not in roles:
+            if not request.user.is_active:
                 return JsonResponse(
                     {
-                        'error': 'PERMISSION_DENIED',
-                        'message': f'Insufficient permissions. Required roles: {[r.name for r in roles]}'
+                        'error': 'ACCOUNT_DEACTIVATED',
+                        'message': 'User account is deactivated'
                     },
                     status=403
                 )
+
+            if roles:
+                if user_role is None:
+                    if hasattr(request.user, 'get_role'):
+                        user_role = request.user.get_role()
+                    elif hasattr(request.user, 'role'):
+                        try:
+                            user_role = Role(request.user.role)
+                        except (ValueError, TypeError):
+                            user_role = None
+
+                if user_role is None or user_role not in roles:
+                    return JsonResponse(
+                        {
+                            'error': 'PERMISSION_DENIED',
+                            'message': f'Insufficient permissions. Required roles: {[r.name for r in roles]}'
+                        },
+                        status=403
+                    )
 
             return original_dispatch(self, request, *args, **kwargs)
 
         cls.dispatch = new_dispatch
         return cls
-
-    return decorator
-
-
-def required_roles(*roles: Role):
-    """
-    Decorator for function-based views
-    """
-    def decorator(view_func):
-        def wrapper(request: HttpRequest, *args, **kwargs):
-            user_role = getattr(request, 'user_role', None)
-
-            if user_role is None:
-                if hasattr(request.user, 'get_role'):
-                    user_role = request.user.get_role()
-                elif hasattr(request.user, 'role'):
-                    try:
-                        user_role = Role(request.user.role)
-                    except (ValueError, TypeError):
-                        user_role = None
-
-            if not request.user.is_authenticated or user_role is None:
-                return JsonResponse(
-                    {
-                        'error': 'AUTHENTICATION_REQUIRED',
-                        'message': 'Authentication required'
-                    },
-                    status=401
-                )
-
-            if user_role not in roles:
-                return JsonResponse(
-                    {
-                        'error': 'PERMISSION_DENIED',
-                        'message': f'Insufficient permissions. Required roles: {[r.name for r in roles]}'
-                    },
-                    status=403
-                )
-
-            return view_func(request, *args, **kwargs)
-
-        return wrapper
 
     return decorator

@@ -1,20 +1,6 @@
 from rest_framework import serializers
-from .models import User
-
-
-class UserSerializer(serializers.ModelSerializer):
-    role_display = serializers.CharField(
-        source='get_role_display', read_only=True)
-
-    class Meta:
-        model = User
-        fields = ('id', 'name', 'email', 'role',
-                  'role_display', 'is_active', 'created_at')
-        read_only_fields = ('id', 'created_at')
-
-    def update(self, instance, validated_data):
-        validated_data.pop('password', None)
-        return super().update(instance, validated_data)
+from django.contrib.auth import authenticate
+from .models import User, Role
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -22,7 +8,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('name', 'email', 'password')
+        fields = ('email', 'name', 'password')
+        extra_kwargs = {
+            'email': {'required': True},
+            'name': {'required': True},
+        }
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -41,22 +31,45 @@ class LoginSerializer(serializers.Serializer):
         email = data.get('email')
         password = data.get('password')
 
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            raise serializers.ValidationError('Invalid credentials')
+        if email and password:
+            user = authenticate(username=email, password=password)
+            if user:
+                if not user.is_active:
+                    raise serializers.ValidationError(
+                        "User account is disabled.")
+                data['user'] = user
+                return data
+            raise serializers.ValidationError(
+                "Unable to log in with provided credentials.")
+        raise serializers.ValidationError(
+            "Must include 'email' and 'password'.")
 
-        if not user.check_password(password):
-            raise serializers.ValidationError('Invalid credentials')
 
-        if not user.is_active:
-            raise serializers.ValidationError('User account is disabled')
-
-        return user
-
-
-class UserRoleUpdateSerializer(serializers.ModelSerializer):
+class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'role')
-        read_only_fields = ('id', 'email')
+        fields = ('id', 'email', 'name', 'role', 'is_active', 'created_at')
+
+
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'name', 'role',
+                  'is_active', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('email', 'name', 'role')
+        extra_kwargs = {
+            'email': {'required': False},
+            'name': {'required': False},
+        }
+
+    def validate_role(self, value):
+        request = self.context.get('request')
+        if request and request.user.role != Role.ADMIN.value:
+            raise serializers.ValidationError("Only admin can change role.")
+        return value

@@ -6,6 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+from apps.users.middleware import require_roles
 
 
 from .enums import Role
@@ -153,19 +154,11 @@ class LogoutView(APIView):
 
 
 class UserListView(APIView):
-    """Get user list (admin only)"""
+    """Get user list"""
     permission_classes = [permissions.IsAuthenticated]
 
+    @require_roles(Role.ADMIN)
     def get(self, request):
-        if not hasattr(request.user, 'role') or request.user.role != Role.ADMIN.value:
-            return Response(
-                {
-                    'error': 'PERMISSION_DENIED',
-                    'message': 'Only admin can access user list'
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         users = User.objects.filter()
         serializer = UserListSerializer(users, many=True)
         return Response({'users': serializer.data})

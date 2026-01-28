@@ -13,10 +13,39 @@ RESTful API для управления заметками с JWT аутенти
 
 1. **Клонируйте репозиторий**
 ```bash
-git clone <repository-url>
-cd <project-directory>
+git clone <repository-url>```
 
-
-2. **Создать 2 тестовых пользователя и заметки к ним**
 ```bash
-python manage.py create_test_data
+cd <project-directory>```
+
+2. **Установить проект командой setup.sh (с выдачей прав)**
+```bash
+chmod +x setup.sh```
+
+```bash
+./setup.sh```
+
+3. **Альтернативный путь установить вручную**
+
+3.1. **Установите зависимости с помощью Pipenv**
+```bash
+pipenv install --dev```
+
+3.2. **Примените миграции базы данных**
+```bash
+pipenv run python manage.py migrate```
+
+3.3. **Создайте тестовых пользователей и заметки с помощью команды python**
+```bash
+pipenv run python manage.py create_test_data```
+
+3.4. **Активируйте, виртуальное окружение и запустите сервер разработки**
+```bash
+pipenv shell```
+
+```bash
+pipenv run python manage.py runserver```
+
+3.5. **Создание супер пользователя в Django admin (если необходимо)**
+```bash
+pipenv run python manage.py createsuperuser```
